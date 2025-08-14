@@ -9,7 +9,7 @@ const EmailSender = () => {
   const [results, setResults] = useState([]);
   const [showResults, setShowResults] = useState(false);
 
-  const API_BASE_URL = 'http://localhost:5000/api';
+  const API_BASE_URL = 'https://mailer-backend-fkm3.onrender.com';
 
   const extractEmailData = (emailString) => {
     return emailString
