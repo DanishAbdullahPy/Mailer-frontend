@@ -9,20 +9,41 @@ axios.defaults.withCredentials = true;
 axios.defaults.headers.common['Content-Type'] = 'application/json';
 
 const EmailSender = () => {
-  // State variables
   const [emails, setEmails] = useState('');
   const [area, setArea] = useState('Full Stack Developer');
   const [sending, setSending] = useState(false);
   const [results, setResults] = useState([]);
   const [showResults, setShowResults] = useState(false);
 
-  // Extract email data function
+  // Enhanced email data extraction with support for JSON format
   const extractEmailData = (emailString) => {
-    return emailString
-      .split('\n')
-      .map(line => line.trim())
-      .filter(line => line && line.includes('@'))
-      .map(email => ({ email }));
+    const lines = emailString.split('\n').map(line => line.trim()).filter(line => line); // FIXED: \n instead of \\n
+    const emailData = [];
+
+    for (const line of lines) {
+      try {
+        // Try to parse as JSON first
+        const parsed = JSON.parse(line);
+        if (parsed.email && parsed.email.includes('@')) {
+          emailData.push({
+            email: parsed.email,
+            name: parsed.name || null,
+            company: parsed.company || null
+          });
+        }
+      } catch (e) {
+        // If not JSON, treat as plain email
+        if (line.includes('@')) {
+          emailData.push({
+            email: line,
+            name: null,
+            company: null
+          });
+        }
+      }
+    }
+
+    return emailData;
   };
 
   const handleSendEmails = async () => {
@@ -38,7 +59,6 @@ const EmailSender = () => {
     try {
       const emailList = extractEmailData(emails);
       
-      // Add explicit headers
       const response = await axios.post(`${API_BASE_URL}/send-bulk-emails`, {
         emails: emailList,
         area: area
@@ -63,11 +83,13 @@ const EmailSender = () => {
     }
   };
 
-  const handleSendSingle = async (email) => {
+  const handleSendSingle = async (emailData) => {
     try {
       setSending(true);
       const response = await axios.post(`${API_BASE_URL}/send-email`, {
-        email: email.trim(),
+        email: emailData.email.trim(),
+        name: emailData.name,
+        company: emailData.company,
         area: area
       }, {
         headers: {
@@ -76,7 +98,7 @@ const EmailSender = () => {
         withCredentials: true
       });
       
-      alert(`Email sent successfully to ${email}`);
+      alert(`Email sent successfully to ${emailData.email}`);
       
     } catch (error) {
       console.error('Error sending email:', error);
@@ -85,7 +107,7 @@ const EmailSender = () => {
       const errorMessage = error.response?.data?.error || error.message || 'Unknown error';
       const errorCode = error.response?.data?.code || 'No code';
       
-      alert(`Failed to send email to ${email}\nError: ${errorMessage}\nCode: ${errorCode}`);
+      alert(`Failed to send email to ${emailData.email}\nError: ${errorMessage}\nCode: ${errorCode}`);
     } finally {
       setSending(false);
     }
@@ -116,11 +138,19 @@ const EmailSender = () => {
             id="emails"
             value={emails}
             onChange={(e) => setEmails(e.target.value)}
-            placeholder="hr@company1.com&#10;recruiter@company2.com&#10;jobs@company3.com"
-            rows="8"
+            placeholder={`Format 1 - Plain emails:
+hr@company1.com
+recruiter@company2.com
+
+Format 2 - JSON with details:
+{"email": "hr@company1.com", "name": "John Doe", "company": "TechCorp"}
+{"email": "jobs@company2.com", "company": "StartupXYZ"}`}
+            rows="10"
           />
           <small className="help-text">
-            Enter one email per line. Names and companies will be auto-detected from email addresses.
+            <strong>Two formats supported:</strong><br/>
+            <strong>1. Plain emails:</strong> hr@company.com (auto-detects names/companies)<br/>
+            <strong>2. JSON format:</strong> {`{"email": "hr@company.com", "name": "John", "company": "TechCorp"}`}
           </small>
         </div>
 
@@ -140,9 +170,14 @@ const EmailSender = () => {
             <div className="email-preview-list">
               {extractEmailData(emails).slice(0, 5).map((emailData, index) => (
                 <div key={index} className="email-preview-item">
-                  <span className="email-address">{emailData.email}</span>
+                  <div className="email-details">
+                    <strong>{emailData.email}</strong>
+                    {emailData.name && <div className="detail-item">👤 {emailData.name}</div>}
+                    {emailData.company && <div className="detail-item">🏢 {emailData.company}</div>}
+                    {!emailData.name && !emailData.company && <div className="detail-item">🤖 Auto-detect</div>}
+                  </div>
                   <button
-                    onClick={() => handleSendSingle(emailData.email)}
+                    onClick={() => handleSendSingle(emailData)}
                     disabled={sending}
                     className="send-button small"
                   >
